@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Список сообщений</title>
+    
+</head>
+<body>
+    <h1>Список сообщений</h1>
+
+    <div id="progress-bar">
+        <span id="progress-text">Чтение сообщений...</span>
+        <div id="progress" style="width: 0%; background: green;"></div>
+    </div>
+    <table id="messages-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Тема</th>
+                <th>Почта</th>
+                <th>Дата получения</th>
+                <th>Описание</th>
+                <th>Прикрепленные файлы</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+        /* Стили для прогресс-бара */
+        #progress-bar {
+            width: 100%;
+            background-color: #fff;
+            margin-top: 10px;
+            margin-bottom: 10px;
+            
+        }
+        #progress {
+            height: 20px;
+            background-color: green;
+            transition: width 2s ease-in;
+        }
+    </style>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        function connect() {
+            const socket = new WebSocket('ws://127.0.0.1:8000/ws');
+
+            socket.onopen = function(e) {
+                socket.send(JSON.stringify({
+                    message: 'Hello from Js client'
+                }));
+            };
+
+            socket.onclose = function(event) {
+                console.log("Соединение закрыто, попытка повторного подключения...");
+                setTimeout(connect, 1000); // Повторная попытка через 5 секунд
+            };
+
+            socket.onmessage = function(event) {
+                
+            try {
+                console.log(event);
+            } catch (e) {
+                console.log('Error:', e.message);
+            }
+            };
+        }
+        
+        function fetchMessages() {
+            $.ajax({
+                url: '/api/messages/',  // URL вашего API
+                method: 'GET',
+                beforeSend: function() {
+                    $('#progress').css('width', '0%'); 
+                },
+                success: function(data) {
+                
+                    const tableBody = $('#messages-table');
+                    let index = 0;
+                    
+
+                    // Проверяем, что данные не пустые
+                    if (data.length === 0) {
+                        tableBody.append('<tr><td colspan="6">Нет сообщений</td></tr>');
+                        return;
+                    }
+
+                    // Обрабатываем каждое сообщение
+                    data.forEach(function(message) {
+                        console.log(message)
+                        const attachmentsList = Array.isArray(message.attachments) ? message.attachments.join(', ') : '';
+
+                        const row = `
+                            <tr>
+                                <td>${message.id}</td>
+                                <td>${message.subject}</td>
+                                <td>${message.receiver}</td>
+                                <td>${message.received_at}</td>
+                                <td>${message.body.substring(0,50)}...</td>
+                                <td>${message.attachments}</td>
+                            </tr>`;
+                        
+                        tableBody.append(row);
+                        const progressPercentage = ((index + 1) / data.length);
+                        $('#progress').css('width', `${progressPercentage}%`);
+                    });
+                    
+                },
+                complete: function() {
+                    $('#progress').css('width', '100%'); // Заполняем прогресс-бар до конца
+                    setTimeout(() => {
+                        $('#progress-bar').hide(); // Скрываем прогресс-бар через 1 секунду
+                    }, 2500);
+                },
+                error: function(xhr, status, error) {
+                    console.error('Ошибка:', error); // Обработка ошибок
+                }
+            });
+        }
+
+        
+        // Запускаем функцию при загрузке страницы
+        $(document).ready(function() {
+            connect();
+            fetchMessages();
+            
+        });
+        
+    </script>
+</body>
+
+</html>
